@@ -1,0 +1,89 @@
+---
+title: "Using R and the Tidyverse to Play Fantasy Baseball"
+author: "Angeline Protacio, Protacio Analytics, LLC"
+date: "7/12/2019"
+output: html_document
+---
+
+## Reading in the data files
+```{r, message=FALSE, warning = FALSE}
+library(dplyr)
+library(purrr)
+
+source("R/load_data.R")
+pos_files <- c("data/depth_1B.csv", "data/depth_2b.csv", 
+               "data/depth_3b.csv", "data/depth_SS.csv", 
+               "data/depth_OF.csv", "data/depth_C.csv")
+pos_names <- c("first_base", "second_base", "third_base", 
+               "short", "outfield", "catcher")
+batters <- map2_df(pos_files, pos_names, load_data) %>%
+  select(Name, Team, playerid, position, PA, R, HR, RBI, 
+         SB, OPS, SO, WAR)
+
+```
+
+## Violin plots - Home Runs by position
+```{r, message=FALSE, warning = FALSE}
+library(ggplot2)
+library(wesanderson)
+ggplot(batters, aes(position, HR, fill = position)) + 
+  geom_violin() + 
+  scale_fill_manual(values = wes_palette("FantasticFox1", 6, type = "continuous")) +
+  theme_bw() + 
+  theme(legend.position="none") + 
+  scale_y_continuous(limits = c(0, 60), expand = c(0, 0))
+```
+
+## Violin plots - Runs by position
+```{r}
+ggplot(batters, aes(position, R, fill = position)) + 
+  geom_violin() + 
+  scale_fill_manual(values = wes_palette("FantasticFox1", 6, type = "continuous")) +
+  theme_bw() + 
+  theme(legend.position="none") + 
+  scale_y_continuous(limits = c(0, 125), expand = c(0, 0))
+```
+
+## Violin plots - Runs Batted In by position
+```{r}
+ggplot(batters, aes(position, RBI, fill = position)) + 
+  geom_violin() + 
+  scale_fill_manual(values = wes_palette("FantasticFox1", 6, type = "continuous")) +
+  theme_bw() + 
+  theme(legend.position="none") + 
+  scale_y_continuous(limits = c(0, 150), expand = c(0, 0))
+```
+
+## Player z-scores
+```{r}
+source("R/z_score.R")
+bat_z <- batters %>%
+  filter(PA >= 300) %>%
+  select(playerid, position, Name, Team, R, HR, RBI, SO, SB, OPS, WAR) %>%
+  mutate(R_z = z_score(R),
+         HR_z = z_score(HR),
+         RBI_z = z_score(RBI),
+         SO_z = -z_score(SO),
+         SB_z = z_score(SB),
+         OPS_z = z_score(OPS),
+        tot_z = round((R_z + HR_z + RBI_z + SO_z + SB_z + OPS_z), 3))
+```
+
+## Top Home Run Hitters
+```{r}
+bat_z %>%
+  top_n(., 5, HR_z) %>% 
+  arrange(desc(HR_z)) %>% 
+  select(position, Name, HR, HR_z) %>%
+  knitr::kable()
+
+```
+
+## Top 5 players, by z-score
+```{r}
+bat_z %>% 
+  top_n(., 5, tot_z) %>% 
+  arrange(desc(tot_z)) %>% 
+  select(position, Name, R, HR, RBI, SO, SB, OPS, WAR, tot_z) %>%
+  knitr::kable()
+```
